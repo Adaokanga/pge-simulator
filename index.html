@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>PGE Simulador - Painel</title>
+    <title>PGE Simulador - Bash + Painel</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
     <style>
@@ -61,7 +61,7 @@
                 <div class="w-12 h-12 rounded-xl bg-gradient-to-br from-blue-400 to-indigo-400 flex items-center justify-center text-white font-black text-xl shadow-lg">PGE</div>
                 <div>
                     <h1 class="text-xl font-bold bg-gradient-to-r from-blue-400 to-indigo-400 bg-clip-text text-transparent">Simulador ESP32</h1>
-                    <p class="text-sm text-slate-400">Painel de Controle • Pavimento Gerador de Energia</p>
+                    <p class="text-sm text-slate-400">Bash + Painel • Pavimento Gerador de Energia</p>
                 </div>
             </div>
             <div class="flex items-center gap-4 flex-wrap">
@@ -77,7 +77,7 @@
     <!-- CARDS PRINCIPAIS -->
     <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
 
-        <!-- CARD: PISADAS -->
+        <!-- CARD: PISADAS (MANUAL) -->
         <div class="bg-slate-800/70 rounded-xl p-6 border border-slate-700/30">
             <div class="flex items-center justify-between mb-4">
                 <h3 class="text-sm font-medium text-slate-400"><i class="fas fa-shoe-prints text-yellow-400 mr-2"></i>Sensor de Pisadas</h3>
@@ -98,31 +98,20 @@
                 <button onclick="simularPisadasMultiplas(10)" class="flex-1 px-3 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg text-sm font-medium transition">+10</button>
                 <button onclick="simularPisadasMultiplas(50)" class="flex-1 px-3 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg text-sm font-medium transition">+50</button>
             </div>
+            <div class="mt-3 text-center text-xs text-slate-500">
+                <span>⚠️ Pisadas são MANUAIS - só ocorrem quando você clica</span>
+            </div>
         </div>
 
-        <!-- CARD: AUTO ELÉTRICO -->
+        <!-- CARD: AUTO ELÉTRICO (BASH) -->
         <div class="bg-slate-800/70 rounded-xl p-6 border border-slate-700/30">
             <div class="flex items-center justify-between mb-4">
-                <h3 class="text-sm font-medium text-slate-400"><i class="fas fa-bolt text-blue-400 mr-2"></i>Auto Elétrico</h3>
+                <h3 class="text-sm font-medium text-slate-400"><i class="fas fa-bolt text-blue-400 mr-2"></i>Auto Elétrico (Bash)</h3>
                 <span class="text-xs text-slate-500" id="autoStatus">Desligado</span>
             </div>
-            <div class="grid grid-cols-2 gap-3 mb-4">
-                <div class="bg-slate-900/50 rounded-lg p-3 text-center">
-                    <p class="text-xs text-slate-400">Corrente</p>
-                    <p class="text-lg font-bold text-blue-400" id="valCorrente">0.00 A</p>
-                </div>
-                <div class="bg-slate-900/50 rounded-lg p-3 text-center">
-                    <p class="text-xs text-slate-400">Tensão</p>
-                    <p class="text-lg font-bold text-green-400" id="valTensao">0.00 V</p>
-                </div>
-                <div class="bg-slate-900/50 rounded-lg p-3 text-center">
-                    <p class="text-xs text-slate-400">Potência</p>
-                    <p class="text-lg font-bold text-yellow-400" id="valPotencia">0.00 W</p>
-                </div>
-                <div class="bg-slate-900/50 rounded-lg p-3 text-center">
-                    <p class="text-xs text-slate-400">Bateria</p>
-                    <p class="text-lg font-bold text-green-400" id="valBateria">0.0 %</p>
-                </div>
+            <div class="bg-slate-900/50 rounded-lg p-3 text-center mb-4">
+                <p class="text-sm text-slate-400">O script bash roda no Render e envia dados automáticos</p>
+                <p class="text-xs text-slate-500 mt-1">Status: <span id="bashStatus" class="text-red-400">❌ Desligado</span></p>
             </div>
             <button onclick="toggleAutoEletrico()" id="btnAutoEletrico" class="sim-btn w-full px-6 py-4 bg-gradient-to-r from-blue-500 to-indigo-500 hover:from-blue-600 hover:to-indigo-600 rounded-xl text-white font-bold text-lg transition flex items-center justify-center gap-2">
                 <i class="fas fa-play"></i>
@@ -149,45 +138,82 @@
 
 <script>
 // ============================================================
-// PAINEL DE CONTROLE - PISADAS MANUAIS + AUTO ELÉTRICO
+// PAINEL - PISADAS MANUAIS + AUTO ELÉTRICO (BASH)
 // ============================================================
 
-const API_BASE = '/api';
-
 let autoEletricoAtivo = false;
-let autoInterval = null;
 let pisadasTotal = 0;
-let contadorCiclos = 0;
+let statusInterval = null;
 
 // ============================================================
 // INICIALIZAÇÃO
 // ============================================================
 document.addEventListener('DOMContentLoaded', function() {
     addLog('🔄 Sistema inicializado', 'info');
-    addLog('📡 Painel de controle ativo', 'info');
+    addLog('📡 Painel + Bash ativo', 'info');
     addLog('👣 Pisadas: MANUAIS', 'info');
-    addLog('⚡ Auto Elétrico: DESLIGADO', 'info');
-    testarConexao();
+    addLog('⚡ Auto Elétrico: controlado pelo bash', 'info');
+    atualizarStatus();
+    statusInterval = setInterval(atualizarStatus, 5000);
 });
 
 // ============================================================
-// TESTAR CONEXÃO
+// ATUALIZAR STATUS
 // ============================================================
-function testarConexao() {
-    fetch(`${API_BASE}/status`)
+function atualizarStatus() {
+    fetch('/api/simulador/status')
         .then(response => response.json())
         .then(data => {
-            addLog(`✅ VPS online! Versão: ${data.version || 'desconhecida'}`, 'success');
-            document.getElementById('statusText').textContent = 'Online';
-            document.getElementById('statusBadge').className = 'inline-flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium border border-green-500/30 bg-green-500/10 text-green-400';
-            document.getElementById('statusDot').className = 'status-dot online';
+            const statusText = data.auto_eletrico ? '🟢 Ativo' : '🔴 Desligado';
+            document.getElementById('bashStatus').textContent = statusText;
+            document.getElementById('bashStatus').className = data.auto_eletrico ? 'text-green-400' : 'text-red-400';
+            document.getElementById('autoStatus').textContent = data.auto_eletrico ? '🟢 Ativo' : '⏹ Desligado';
+            document.getElementById('autoStatus').className = data.auto_eletrico ? 'text-xs text-green-400' : 'text-xs text-slate-500';
+            
+            if (data.pisadas_total > pisadasTotal) {
+                pisadasTotal = data.pisadas_total;
+                document.getElementById('pisadasDisplay').textContent = pisadasTotal;
+                document.getElementById('pisadasTotalLabel').textContent = `Total: ${pisadasTotal}`;
+            }
+            
+            document.getElementById('lastUpdate').textContent = new Date().toLocaleTimeString();
         })
         .catch(error => {
-            addLog(`❌ Erro ao conectar: ${error.message}`, 'error');
-            document.getElementById('statusText').textContent = 'Offline';
-            document.getElementById('statusBadge').className = 'inline-flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium border border-red-500/30 bg-red-500/10 text-red-400';
-            document.getElementById('statusDot').className = 'status-dot offline';
+            console.error('Erro ao atualizar status:', error);
         });
+}
+
+// ============================================================
+// AUTO ELÉTRICO (BASH)
+// ============================================================
+function toggleAutoEletrico() {
+    autoEletricoAtivo = !autoEletricoAtivo;
+    const btn = document.getElementById('btnAutoEletrico');
+    
+    fetch('/api/simulador/auto', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ativo: autoEletricoAtivo })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.status === 'success') {
+            if (autoEletricoAtivo) {
+                btn.className = 'sim-btn w-full px-6 py-4 bg-gradient-to-r from-red-500 to-rose-500 hover:from-red-600 hover:to-rose-600 rounded-xl text-white font-bold text-lg transition flex items-center justify-center gap-2';
+                btn.innerHTML = '<i class="fas fa-stop"></i><span>PARAR AUTO ELÉTRICO</span>';
+                addLog('▶️ Auto Elétrico ATIVADO (bash)', 'success');
+            } else {
+                btn.className = 'sim-btn w-full px-6 py-4 bg-gradient-to-r from-blue-500 to-indigo-500 hover:from-blue-600 hover:to-indigo-600 rounded-xl text-white font-bold text-lg transition flex items-center justify-center gap-2';
+                btn.innerHTML = '<i class="fas fa-play"></i><span>INICIAR AUTO ELÉTRICO</span>';
+                addLog('⏹ Auto Elétrico DESATIVADO (bash)', 'warning');
+            }
+            atualizarStatus();
+        }
+    })
+    .catch(error => {
+        addLog(`❌ Erro ao controlar auto elétrico: ${error.message}`, 'error');
+        autoEletricoAtivo = !autoEletricoAtivo; // Reverter
+    });
 }
 
 // ============================================================
@@ -198,24 +224,19 @@ function simularPisada() {
     btn.classList.add('pulsing');
     setTimeout(() => btn.classList.remove('pulsing'), 1500);
     
-    pisadasTotal++;
-    document.getElementById('pisadasDisplay').textContent = pisadasTotal;
-    document.getElementById('pisadasTotalLabel').textContent = `Total: ${pisadasTotal}`;
-    document.getElementById('ultimaPisada').textContent = new Date().toLocaleTimeString();
-    
-    const data = {
-        contador_pisadas: pisadasTotal,
-        pisadas_por_minuto: Math.floor(Math.random() * 10) + 1
-    };
-    
-    fetch(`${API_BASE}/data`, {
+    fetch('/api/simulador/pisada', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data)
+        headers: { 'Content-Type': 'application/json' }
     })
     .then(response => response.json())
-    .then(() => {
-        addLog(`👣 Pisada #${pisadasTotal} enviada!`, 'pisada');
+    .then(data => {
+        if (data.status === 'success') {
+            pisadasTotal = data.pisada;
+            document.getElementById('pisadasDisplay').textContent = pisadasTotal;
+            document.getElementById('pisadasTotalLabel').textContent = `Total: ${pisadasTotal}`;
+            document.getElementById('ultimaPisada').textContent = new Date().toLocaleTimeString();
+            addLog(`👣 Pisada #${pisadasTotal} enviada!`, 'pisada');
+        }
     })
     .catch(error => {
         addLog(`❌ Erro ao enviar pisada: ${error.message}`, 'error');
@@ -229,96 +250,6 @@ function simularPisadasMultiplas(quantidade) {
         }, i * 150);
     }
     addLog(`👣 Simulando ${quantidade} pisadas...`, 'pisada');
-}
-
-// ============================================================
-// AUTO ELÉTRICO
-// ============================================================
-function toggleAutoEletrico() {
-    autoEletricoAtivo = !autoEletricoAtivo;
-    const btn = document.getElementById('btnAutoEletrico');
-    const status = document.getElementById('autoStatus');
-    
-    if (autoEletricoAtivo) {
-        btn.className = 'sim-btn w-full px-6 py-4 bg-gradient-to-r from-red-500 to-rose-500 hover:from-red-600 hover:to-rose-600 rounded-xl text-white font-bold text-lg transition flex items-center justify-center gap-2';
-        btn.innerHTML = '<i class="fas fa-stop"></i><span>PARAR AUTO ELÉTRICO</span>';
-        status.textContent = '🟢 Ativo';
-        status.className = 'text-xs text-green-400';
-        addLog('▶️ Auto Elétrico ATIVADO', 'success');
-        iniciarAutoEletrico();
-    } else {
-        btn.className = 'sim-btn w-full px-6 py-4 bg-gradient-to-r from-blue-500 to-indigo-500 hover:from-blue-600 hover:to-indigo-600 rounded-xl text-white font-bold text-lg transition flex items-center justify-center gap-2';
-        btn.innerHTML = '<i class="fas fa-play"></i><span>INICIAR AUTO ELÉTRICO</span>';
-        status.textContent = '⏹ Desligado';
-        status.className = 'text-xs text-slate-500';
-        addLog('⏹ Auto Elétrico DESATIVADO', 'warning');
-        pararAutoEletrico();
-    }
-}
-
-function iniciarAutoEletrico() {
-    if (autoInterval) clearInterval(autoInterval);
-    contadorCiclos = 0;
-    document.getElementById('autoContador').textContent = 'Ciclos: 0';
-    
-    autoInterval = setInterval(() => {
-        if (!autoEletricoAtivo) return;
-        contadorCiclos++;
-        document.getElementById('autoContador').textContent = `Ciclos: ${contadorCiclos}`;
-        
-        const corrente = (1 + Math.random() * 14).toFixed(2);
-        const tensao = (215 + Math.random() * 20).toFixed(2);
-        const potencia = (corrente * tensao).toFixed(2);
-        const bateria = (70 + Math.random() * 30).toFixed(1);
-        
-        document.getElementById('valCorrente').textContent = `${corrente} A`;
-        document.getElementById('valTensao').textContent = `${tensao} V`;
-        document.getElementById('valPotencia').textContent = `${potencia} W`;
-        document.getElementById('valBateria').textContent = `${bateria} %`;
-        
-        if (contadorCiclos % 3 === 0) {
-            addLog(`⚡ Ciclo #${contadorCiclos}: ${corrente}A | ${tensao}V | ${potencia}W`, 'eletrico');
-        }
-        
-        const data = {
-            corrente: parseFloat(corrente),
-            tensao: parseFloat(tensao),
-            potencia: parseFloat(potencia),
-            energia_diaria: parseFloat((0.5 + Math.random() * 2).toFixed(4)),
-            bateria_soc: parseFloat(bateria),
-            temperatura: parseFloat((22 + Math.random() * 13).toFixed(1)),
-            luminosidade: parseFloat((10 + Math.random() * 85).toFixed(0)),
-            pisadas_por_minuto: Math.floor(Math.random() * 12),
-            hora: new Date().getHours(),
-            minuto: new Date().getMinutes(),
-            calibracao: true,
-            rele_usb: true,
-            rele_tomadas: true,
-            rele_luzes: false
-        };
-        
-        fetch(`${API_BASE}/data`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(data)
-        })
-        .then(response => response.json())
-        .then(() => {
-            document.getElementById('lastUpdate').textContent = new Date().toLocaleTimeString();
-        })
-        .catch(error => {
-            addLog(`❌ Erro no auto elétrico: ${error.message}`, 'error');
-        });
-        
-    }, 3000);
-}
-
-function pararAutoEletrico() {
-    if (autoInterval) {
-        clearInterval(autoInterval);
-        autoInterval = null;
-    }
-    document.getElementById('autoContador').textContent = 'Ciclos: 0';
 }
 
 // ============================================================
@@ -354,7 +285,7 @@ window.simularPisada = simularPisada;
 window.simularPisadasMultiplas = simularPisadasMultiplas;
 window.toggleAutoEletrico = toggleAutoEletrico;
 window.limparLogs = limparLogs;
-window.testarConexao = testarConexao;
+window.atualizarStatus = atualizarStatus;
 
 </script>
 </body>
