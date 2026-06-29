@@ -52,6 +52,14 @@ app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'index.html'));
 });
 
+app.get('/health', (req, res) => {
+    res.json({
+        status: 'healthy',
+        timestamp: new Date().toISOString(),
+        uptime: process.uptime()
+    });
+});
+
 // ============================================================
 // INICIAR SERVIDOR
 // ============================================================
@@ -62,13 +70,24 @@ app.listen(PORT, '0.0.0.0', () => {
     console.log('║   🚀 PGE SIMULADOR - PAINEL DE CONTROLE                ║');
     console.log('║                                                          ║');
     console.log(`║   📡 Servidor rodando na porta: ${PORT}                 ║`);
-    console.log(`║   🔗 Proxy: http://${VPS_IP}:${VPS_PORT}               ║');
+    console.log(`║   🔗 Proxy: http://${VPS_IP}:${VPS_PORT}               ║`);
     console.log('║                                                          ║');
     console.log('╚══════════════════════════════════════════════════════════╝');
     console.log('');
     console.log('✅ Servidor pronto!');
     console.log('👣 Pisadas: MANUAIS (clique no botão)');
     console.log('⚡ Auto Elétrico: controlado por botão');
+});
+
+// ============================================================
+// TRATAMENTO DE ERROS
+// ============================================================
+process.on('uncaughtException', (err) => {
+    console.error('❌ Erro não tratado:', err);
+});
+
+process.on('unhandledRejection', (err) => {
+    console.error('❌ Promessa rejeitada:', err);
 });
 
 module.exports = app;
